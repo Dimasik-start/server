@@ -11,7 +11,7 @@ const io = socketIo(server, {
 });
 
 app.use(cors());
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 
 // Хранилище подключенных агентов
 const agents = new Map();
