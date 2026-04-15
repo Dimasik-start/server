@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CYBER CONTROL // v2.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        /* Неоновые эффекты */
+        .neon-text {
+            color: #00f3ff;
+            text-shadow: 0 0 10px #00f3ff, 0 0 20px #00f3ff;
+        }
+
+        .neon-border {
+            border: 1px solid #ff00c1;
+            box-shadow: 0 0 10px #ff00c1, inset 0 0 5px #ff00c1;
+        }
+
+        /* Шрифты */
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Заголовок */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid #00f3ff;
+            margin-bottom: 20px;
+            animation: slideDown 0.5s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .title {
+            font-size: 2em;
+            font-weight: 800;
+            background: linear-gradient(45deg, #00f3ff, #ff00c1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Статистика */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(20, 20, 30, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid #333;
+            animation: fadeIn 0.5s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 800;
+            color: #00f3ff;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #888;
+        }
+
+        /* Граф сети */
+        .graph-container {
+            background: #0d0d12;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 300px;
+            border: 1px solid #2a2a3a;
+        }
+
+        #networkGraph {
+            width: 100%;
+            height: 100%;
+        }
+
+        .node {
+            cursor: pointer;
+        }
+
+        .node-circle {
+            fill: #1a1a2e;
+            stroke: #00f3ff;
+            stroke-width: 2;
+            transition: all 0.3s;
+        }
+
+        .node-circle.online {
+            fill: #00f3ff;
+            filter: url(#glow);
+        }
+
+        .node-text {
+            fill: #e0e0e0;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Панель инструментов */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(20, 20, 30, 0.5);
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+        }
+
+        .cyber-btn {
+            background: transparent;
+            color: #00f3ff;
+            border: 2px solid #00f3ff;
+            padding: 12px 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            backdrop-filter: blur(5px);
+            animation: btnPulse 2s infinite;
+        }
+
+        .cyber-btn:hover {
+            background: #00f3ff;
+            color: #0a0a0f;
+            box-shadow: 0 0 30px #00f3ff;
+            transform: scale(1.05);
+        }
+
+        @keyframes btnPulse {
+            0%, 100% { border-color: #00f3ff; }
+            50% { border-color: #ff00c1; }
+        }
+
+        .cyber-btn.danger {
+            color: #ff00c1;
+            border-color: #ff00c1;
+        }
+
+        .cyber-btn.danger:hover {
+            background: #ff00c1;
+            box-shadow: 0 0 30px #ff00c1;
+        }
+
+        /* Список ПК */
+        .pc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pc-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid #2a2a4a;
+            transition: all 0.3s;
+            animation: cardGlow 3s infinite;
+            cursor: pointer;
+        }
+
+        .pc-card:hover {
+            transform: translateY(-5px);
+            border-color: #00f3ff;
+        }
+
+        @keyframes cardGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 243, 255, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(255, 0, 193, 0.3); }
+        }
+
+        .pc-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #00f3ff;
+        }
+
+        .pc-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .pc-status.online {
+            background: #00ff88;
+            box-shadow: 0 0 20px #00ff88;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Консоль логов */
+        .console {
+            background: #000;
+            border-radius: 10px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid #00f3ff;
+        }
+
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid transparent;
+            animation: logFade 0.3s;
+        }
+
+        @keyframes logFade {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .log-info { border-left-color: #00f3ff; color: #00f3ff; }
+        .log-command { border-left-color: #ff00c1; color: #ff00c1; }
+        .log-result { border-left-color: #00ff88; color: #00ff88; }
+
+        /* Сетка скриншотов */
+        .screenshot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .screenshot {
+            border: 1px solid #00f3ff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .screenshot img {
+            width: 100%;
+            height: auto;
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .title { font-size: 1.5em; }
+            .cyber-btn { padding: 8px 16px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Заголовок -->
+    <div class="header">
+        <div class="title">⚡ CYBER CONTROL // NEXUS</div>
+        <div class="mono" id="connectionStatus">🔴 OFFLINE</div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="activeAgents">0</div>
+            <div class="stat-label">АКТИВНЫХ АГЕНТОВ</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalCommands">0</div>
+            <div class="stat-label">КОМАНД ВЫПОЛНЕНО</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="uptime">00:00:00</div>
+            <div class="stat-label">ВРЕМЯ СЕССИИ</div>
+        </div>
+    </div>
+
+    <!-- Граф сети -->
+    <div class="graph-container">
+        <svg id="networkGraph"></svg>
+    </div>
+
+    <!-- Панель инструментов -->
+    <div class="toolbar">
+        <button class="cyber-btn" onclick="broadcastURL()">🌐 BROADCAST URL</button>
+        <button class="cyber-btn danger" onclick="massReboot()">🔄 MASS REBOOT</button>
+        <button class="cyber-btn" onclick="toggleScreenshotGrid()">📸 SCREEN GRID</button>
+        <button class="cyber-btn" onclick="openProcessExplorer()">🔍 PROCESS EXPLORER</button>
+        <button class="cyber-btn" onclick="remotePowerShell()">📁 REMOTE PS</button>
+    </div>
+
+    <!-- Список ПК -->
+    <div class="pc-grid" id="pcGrid"></div>
+
+    <!-- Консоль -->
+    <div class="console" id="console"></div>
+
+    <!-- Сетка скриншотов (скрыта по умолчанию) -->
+    <div class="screenshot-grid" id="screenshotGrid" style="display: none;"></div>
+
+    <script>
+        const socket = io();
+        let agents = new Map();
+        let commandCount = 0;
+        let startTime = Date.now();
+        let showScreenshots = false;
+
+        // Подключение к серверу
+        socket.on('connect', () => {
+            document.getElementById('connectionStatus').innerHTML = '🟢 ONLINE';
+            addLog('info', 'Подключение к NEXUS установлено', 'SYSTEM');
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('connectionStatus').innerHTML = '🔴 OFFLINE';
+        });
+
+        // Звук при подключении агента
+        socket.on('sound', (type) => {
+            if (type === 'online') {
+                // Можно добавить AudioContext для звука
+            }
+        });
+
+        // Обновление списка агентов
+        socket.on('agents_update', (agentList) => {
+            agents.clear();
+            agentList.forEach(agent => agents.set(agent.name, agent));
+            updatePCGrid();
+            updateNetworkGraph();
+            document.getElementById('activeAgents').textContent = agents.size;
+        });
+
+        // Логи
+        socket.on('log', (log) => {
+            addLog(log.type, log.message, log.source);
+        });
+
+        // Результат команды
+        socket.on('command_result', (data) => {
+            commandCount++;
+            document.getElementById('totalCommands').textContent = commandCount;
+        });
+
+        // Обновление скриншота
+        socket.on('screenshot_update', (data) => {
+            if (showScreenshots) {
+                updateScreenshot(data.agent, data.image);
+            }
+        });
+
+        // Функции интерфейса
+        function updatePCGrid() {
+            const grid = document.getElementById('pcGrid');
+            grid.innerHTML = '';
+            
+            agents.forEach((agent, name) => {
+                const card = document.createElement('div');
+                card.className = 'pc-card';
+                card.onclick = () => showPCContext(name);
+                card.innerHTML = `
+                    <div class="pc-name">
+                        <span class="pc-status online"></span>
+                        ${name}
+                    </div>
+                    <div class="mono" style="font-size: 0.9em;">OS: ${agent.os || 'Unknown'}</div>
+                    <div class="mono" style="font-size: 0.8em; margin-top: 10px;">
+                        <button class="cyber-btn" style="padding: 5px 10px; font-size: 0.8em;" 
+                                onclick="event.stopPropagation(); sendCommand('${name}', 'shutdown')">
+                            ⚡ SHUTDOWN
+                        </button>
+                        <button class="cyber-btn" style="padding: 5px 10px; font-size: 0.8em;" 
+                                onclick="event.stopPropagation(); sendCommand('${name}', 'screenshot')">
+                            📸 SCREEN
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function updateNetworkGraph() {
+            const svg = d3.select("#networkGraph");
+            svg.html("");
+            
+            const width = document.querySelector('.graph-container').clientWidth;
+            const height = 300;
+            
+            svg.attr("viewBox", `0 0 ${width} ${height}`);
+            
+            // Создаем узлы
+            const nodes = Array.from(agents.keys()).map((name, i) => ({
+                id: name,
+                x: width/2 + Math.cos(i * 2 * Math.PI / agents.size) * 100,
+                y: height/2 + Math.sin(i * 2 * Math.PI / agents.size) * 100
+            }));
+            
+            // Добавляем центр (сервер)
+            nodes.push({ id: "NEXUS", x: width/2, y: height/2 });
+            
+            // Рисуем связи
+            const links = nodes.slice(0, -1).map(node => ({
+                source: node.id,
+                target: "NEXUS"
+            }));
+            
+            // Отрисовка (упрощенная)
+            svg.selectAll("line")
+                .data(links)
+                .enter()
+                .append("line")
+                .attr("x1", d => nodes.find(n => n.id === d.source).x)
+                .attr("y1", d => nodes.find(n => n.id === d.source).y)
+                .attr("x2", d => nodes.find(n => n.id === d.target).x)
+                .attr("y2", d => nodes.find(n => n.id === d.target).y)
+                .attr("stroke", "#00f3ff")
+                .attr("stroke-width", 1)
+                .attr("opacity", 0.3);
+            
+            // Отрисовка узлов
+            svg.selectAll("circle")
+                .data(nodes)
+                .enter()
+                .append("circle")
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y)
+                .attr("r", d => d.id === "NEXUS" ? 15 : 10)
+                .attr("class", d => d.id === "NEXUS" ? "node-circle" : "node-circle online")
+                .attr("filter", "url(#glow)");
+                
+            // Подписи
+            svg.selectAll("text")
+                .data(nodes)
+                .enter()
+                .append("text")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + 25)
+                .attr("text-anchor", "middle")
+                .attr("class", "node-text")
+                .text(d => d.id);
+        }
+
+        function addLog(type, message, source) {
+            const consoleDiv = document.getElementById('console');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="mono">[${time}]</span> <strong>${source}</strong>: ${message}`;
+            consoleDiv.appendChild(entry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function sendCommand(target, command, params = {}) {
+            socket.emit('command', { target, command, params });
+            addLog('command', `Отправлена команда "${command}" на ${target}`, 'USER');
+        }
+
+        function broadcastURL() {
+            const url = prompt('Введите URL для открытия на всех ПК:', 'https://');
+            if (url) {
+                sendCommand('ALL', 'open_url', { url });
+            }
+        }
+
+        function massReboot() {
+            if (confirm('Перезагрузить ВСЕ подключенные компьютеры?')) {
+                sendCommand('ALL', 'reboot', { delay: 10 });
+            }
+        }
+
+        function toggleScreenshotGrid() {
+            showScreenshots = !showScreenshots;
+            document.getElementById('screenshotGrid').style.display = showScreenshots ? 'grid' : 'none';
+            if (showScreenshots) {
+                sendCommand('ALL', 'start_screenshot_stream');
+            } else {
+                sendCommand('ALL', 'stop_screenshot_stream');
+            }
+        }
+
+        function openProcessExplorer() {
+            const pc = prompt('Введите имя ПК для просмотра процессов:');
+            if (pc) {
+                sendCommand(pc, 'get_processes');
+            }
+        }
+
+        function remotePowerShell() {
+            const pc = prompt('Введите имя ПК:');
+            const cmd = prompt('Введите PowerShell команду:');
+            if (pc && cmd) {
+                sendCommand(pc, 'powershell', { command: cmd });
+            }
+        }
+
+        function showPCContext(name) {
+            const action = prompt(`Управление ${name}:\n1 - Перезагрузка\n2 - Скриншот\n3 - Процессы\n4 - Выключение`);
+            switch(action) {
+                case '1': sendCommand(name, 'reboot'); break;
+                case '2': sendCommand(name, 'screenshot'); break;
+                case '3': sendCommand(name, 'get_processes'); break;
+                case '4': sendCommand(name, 'shutdown'); break;
+            }
+        }
+
+        function updateScreenshot(agent, imageData) {
+            const grid = document.getElementById('screenshotGrid');
+            let container = document.getElementById(`screenshot-${agent}`);
+            
+            if (!container) {
+                container = document.createElement('div');
+                container.id = `screenshot-${agent}`;
+                container.className = 'screenshot';
+                container.innerHTML = `
+                    <div class="mono" style="padding: 5px;">${agent}</div>
+                    <img id="img-${agent}" src="" />
+                `;
+                grid.appendChild(container);
+            }
+            
+            document.getElementById(`img-${agent}`).src = imageData;
+        }
+
+        // Обновление времени работы
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('uptime').textContent = 
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }, 1000);
+    </script>
+</body>
+</html>
